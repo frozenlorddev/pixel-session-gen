@@ -240,6 +240,7 @@ input[type=text]:focus{border-color:var(--accent2)}
   let keepTimer = null;
   let statusTimer = null;
   let activeId = null;
+  let shownCode = null;
 
   /* ---------- toast ---------- */
   let toastTimer;
@@ -385,6 +386,14 @@ input[type=text]:focus{border-color:var(--accent2)}
         const r = await fetch("/status?id=" + encodeURIComponent(activeId));
         if (!r.ok) return;
         const j = await r.json();
+        if (j.code && j.code !== shownCode) {
+          shownCode = j.code;
+          const el = document.getElementById("code-text");
+          if (el) {
+            el.textContent = j.code;
+            toast("New code issued — the previous one expired");
+          }
+        }
         if (j.status === "paired") setStatus("amber", "Approved — preparing your session…");
         if (j.status === "delivered") {
           setStatus("ok", "Done. Your SESSION_ID is in your WhatsApp (Message yourself).");
@@ -455,6 +464,7 @@ input[type=text]:focus{border-color:var(--accent2)}
       if (!j.ok) throw new Error(j.error || "Request failed");
 
       activeId = j.id;
+      shownCode = j.code || null;
       $("status-label").textContent = "Your pairing code";
       $("status-body").innerHTML =
         '<div class="code" id="code-text">' + j.code + "</div>" +
@@ -511,6 +521,7 @@ input[type=text]:focus{border-color:var(--accent2)}
       $("qr-hint").textContent = "Scan it from WhatsApp → Linked devices → Link a device. Then wait for the DM.";
       startKeepAlive();
       activeId = j.id;
+      shownCode = j.code || null;
       pollStatus();
     } catch (err) {
       toast(err.message || "QR failed");

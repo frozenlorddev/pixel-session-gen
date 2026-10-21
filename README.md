@@ -23,11 +23,22 @@ Rebuilt from `EliteProTech/ELITEPRO-SESSION-ID` with three changes that matter:
    `node index.js` (no pm2), and the page pings `/keepalive` while a pairing is in
    flight so the service isn't spun down mid-handoff.
 
-**Baileys: `blacklord-baileys@1.0.1` only.** No fallback and no second build in
-`node_modules` — the library that mints the session is the library that later
-consumes it, so creds can't come from a differently-behaved fork. If the package
-is missing the app refuses to boot with
-`blacklord-baileys is required but not installed` instead of quietly downgrading.
+**Baileys: `@whiskeysockets/baileys@6.7.24` only.** This is the build the
+original Elite session generator pairs with, and it is the one that reliably
+issues a code and completes the link. No resolver, no fallback — a second build
+on disk is how you get a code that is issued but never finishes. The `creds.json`
+it writes is plain JSON and loads fine on the bot's 7.x fork.
+
+Three things in `routes/pair.js` exist purely to stop "stuck on login":
+
+1. **`connection.update` is attached before the code is requested.** Otherwise a
+   socket that closes while the code is in flight is never reported, and the page
+   waits forever on a dead socket.
+2. **2 s delay + an explicit 8-character code.** `requestPairingCode` throws
+   `Connection Closed` on 6.7.24 if it is called before the websocket settles.
+3. **5-minute watchdog + one re-issue.** A pairing code dies with its socket, so
+   if WhatsApp drops the connection before approval the server issues a fresh code
+   and pushes it to the page through `/status`.
 
 ---
 
@@ -59,7 +70,9 @@ Add env vars if you want to override the defaults:
 | `MAX_ACTIVE` | `4` | Concurrent pairing sockets (free 512 MB dies above ~5) |
 | `PER_IP` | `3` | Pairing attempts per IP |
 | `WINDOW_MS` | `600000` | Rate-limit window (10 min) |
-| `NODE_VERSION` | `20.18.1` | blacklord-baileys targets Node 20 |
+| `NODE_VERSION` | `20.18.1` | Baileys 6.7.24 targets Node 20 |
+| `LINK_TIMEOUT_MS` | `300000` | How long a code stays usable |
+| `MAX_CODE_RETRIES` | `2` | Re-issues after a dropped socket |
 
 ---
 
@@ -103,7 +116,7 @@ The session is never returned over HTTP — only to the account that paired.
 | `GET /` | UI |
 | `GET /code?number=2547…` | `{ ok, code, id }` — 8-char pairing code |
 | `GET /qr` | `{ ok, qr }` — data-URL QR |
-| `GET /status?id=…` | `started` → `waiting` → `paired` → `delivered` / `failed` |
+| `GET /status?id=…` | `started` → `waiting` → `paired` → `delivered` / `failed`, plus the current code |
 | `GET /keepalive` | Warm-up ping, also reports active sockets |
 | `GET /healthz` | Bot name, resolved Baileys build, uptime |
 

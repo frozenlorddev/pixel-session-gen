@@ -36,7 +36,7 @@ app.get("/status", (req, res) => {
   const id = String(req.query.id || "");
   const row = board.get(id);
   if (!row) return res.status(404).json({ ok: false, status: "unknown" });
-  return res.json({ ok: true, status: row.status, reason: row.reason || null });
+  return res.json({ ok: true, status: row.status, reason: row.reason || null, code: row.code || null });
 });
 
 app.get("/healthz", (req, res) =>
