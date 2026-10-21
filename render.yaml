@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: pixel-session-gen
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm install --omit=dev
+    startCommand: node index.js
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "20.18.1"
+      - key: BOT_NAME
+        value: Pixel X Ultra
+      - key: MAX_ACTIVE
+        value: "4"
+      - key: PER_IP
+        value: "3"
+      - key: WINDOW_MS
+        value: "600000"

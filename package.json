@@ -1,0 +1,20 @@
+{
+  "name": "pixel-session-gen",
+  "version": "1.0.0",
+  "description": "Pixel X Ultra session generator — pairing code and QR, renders a SESSION_ID your bot can read directly.",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "blacklord-baileys": "1.0.1",
+    "express": "^4.21.2",
+    "pino": "^9.5.0",
+    "qrcode": "^1.5.4"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Pixel X Ultra · Session Generator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050807; --bg2:#0a1210; --card:#0c1512; --card2:#101c18;
+  --line:rgba(120,255,180,.13); --line2:rgba(120,255,180,.3);
+  --text:#eaf6ef; --muted:#7d9c8c;
+  --accent:#25d366; --accent-deep:#0a5c2f; --accent2:#5ef2a0;
+  --green:#33d488; --amber:#ffce54; --red:#ff6b6b;
+  --fh:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{min-height:100%}
+body{font-family:var(--fh);background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+body::before{
+  content:'';position:fixed;inset:0;z-index:0;
+  background:url('/img/pixel.jpg') center/cover no-repeat;
+  filter:blur(26px) saturate(.7) brightness(.34);
+  transform:scale(1.12);opacity:.55;pointer-events:none;
+}
+body::after{content:'';position:fixed;inset:0;z-index:0;background:linear-gradient(180deg,rgba(5,8,7,.35),rgba(5,8,7,.92));pointer-events:none}
+.wrap{position:relative;z-index:1;max-width:480px;margin:0 auto;padding:0 16px 90px}
+
+.topnav{position:sticky;top:0;z-index:500;display:flex;align-items:center;gap:10px;padding:14px 16px;background:rgba(5,8,7,.72);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+.menu-burger{background:transparent;border:none;color:var(--text);cursor:pointer;padding:7px;border-radius:9px;display:flex;align-items:center;justify-content:center;transition:background .15s}
+.menu-burger:hover{background:rgba(255,255,255,.07)}
+.topnav-title{font-weight:700;font-size:.95rem;letter-spacing:.02em}
+.topnav-badge{margin-left:auto;font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--accent2);border:1px solid var(--line2);border-radius:99px;padding:4px 9px}
+.sq-menu-dropdown{position:absolute;top:52px;left:12px;background:var(--card2);border:1px solid var(--line2);border-radius:14px;padding:6px;min-width:220px;box-shadow:0 16px 40px rgba(0,0,0,.6);display:none;flex-direction:column;z-index:600}
+.sq-menu-dropdown.show{display:flex}
+.sq-menu-dropdown button{display:flex;align-items:center;gap:10px;background:transparent;border:none;color:var(--text);padding:11px 12px;font-size:.85rem;font-weight:500;cursor:pointer;border-radius:9px;text-align:left;width:100%;font-family:inherit}
+.sq-menu-dropdown button:hover{background:rgba(255,255,255,.06)}
+
+.hero{position:relative;height:240px;margin:0 -16px;overflow:hidden;border-bottom:1px solid var(--line)}
+.hero img{width:100%;height:100%;object-fit:cover;object-position:center 32%}
+.hero::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(5,8,7,.1) 0%,rgba(5,8,7,.55) 58%,var(--bg) 100%)}
+.hero-text{position:absolute;left:20px;right:20px;bottom:14px;z-index:1}
+.hero-text .name{font-size:1.65rem;font-weight:700;letter-spacing:.02em;line-height:1;text-shadow:0 2px 18px rgba(0,0,0,.65)}
+.hero-text .tag{font-size:.72rem;color:var(--accent2);letter-spacing:.14em;text-transform:uppercase;margin-top:6px;font-weight:600}
+
+.wrap-inner{padding-top:16px}
+.header{display:flex;align-items:center;justify-content:center;margin:2px 0 18px}
+.stat-pill{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:99px;padding:9px 18px;font-size:.83rem;font-weight:500;color:var(--text)}
+.pulse-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 rgba(51,212,136,.6);animation:pulse 2s infinite;flex-shrink:0}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(51,212,136,.55)}70%{box-shadow:0 0 0 7px rgba(51,212,136,0)}100%{box-shadow:0 0 0 0 rgba(51,212,136,0)}}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px;margin-bottom:14px;backdrop-filter:blur(6px)}
+.card-label{font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.11em;margin-bottom:12px;display:block;font-weight:600}
+
+.country-trigger{width:100%;background:var(--bg2);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:14px 15px;font-size:.88rem;font-family:inherit;display:flex;align-items:center;justify-content:space-between;cursor:pointer;transition:border-color .15s;margin-bottom:16px}
+.country-trigger:hover{border-color:var(--accent2)}
+.country-trigger svg{color:var(--muted);flex-shrink:0}
+
+.phone-row{display:flex;gap:8px;margin-bottom:18px}
+.prefix-wrap{position:relative;flex-shrink:0}
+.prefix-box{background:rgba(37,211,102,.09);border:1px solid rgba(37,211,102,.32);border-radius:12px;padding:14px;color:var(--accent2);font-family:ui-monospace,monospace;font-weight:700;font-size:.9rem;white-space:nowrap;display:flex;align-items:center;justify-content:center;min-width:70px}
+.prefix-input{position:absolute;inset:0;background:transparent;border:none;outline:none;color:var(--accent2);font-family:ui-monospace,monospace;font-weight:700;font-size:.9rem;text-align:center;width:100%;padding:0 8px}
+input[type=text]{flex:1;background:var(--bg2);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:14px 15px;font-size:.9rem;font-family:inherit;outline:none;transition:border-color .15s;min-width:0}
+input[type=text]:focus{border-color:var(--accent2)}
+
+.btn{width:100%;background:linear-gradient(135deg,var(--accent),var(--accent-deep));color:#04220f;border:none;border-radius:12px;padding:15px;font-weight:700;font-size:.9rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 6px 22px rgba(37,211,102,.25);transition:transform .1s,box-shadow .15s;font-family:inherit}
+.btn:active{transform:scale(.985)}
+.btn:disabled{opacity:.55;cursor:not-allowed;box-shadow:none}
+.btn-ghost{background:var(--card2);border:1px solid var(--line);color:var(--text);box-shadow:none;margin-top:10px;font-weight:600}
+.btn-ghost:hover{border-color:var(--line2)}
+.spin{width:15px;height:15px;border:2px solid rgba(0,0,0,.25);border-top-color:#04220f;border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+.code-box{text-align:center;padding:20px 0 6px}
+.code{font-size:2rem;font-weight:700;letter-spacing:.16em;color:var(--accent2);margin-bottom:12px;font-family:ui-monospace,monospace}
+.hint{font-size:.78rem;color:var(--muted);line-height:1.55}
+.steps{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:8px}
+.steps li{display:flex;gap:10px;font-size:.79rem;color:var(--muted);line-height:1.5}
+.steps b{color:var(--text);font-weight:600}
+.steps .n{flex-shrink:0;width:18px;height:18px;border-radius:50%;background:rgba(37,211,102,.14);border:1px solid var(--line2);color:var(--accent2);font-size:.65rem;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:1px}
+.status-line{display:flex;align-items:center;gap:9px;justify-content:center;font-size:.78rem;color:var(--muted);margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.dot.amber{background:var(--amber);animation:pulse2 1.6s infinite}
+.dot.ok{background:var(--green)}
+.dot.bad{background:var(--red)}
+@keyframes pulse2{0%,100%{opacity:.4}50%{opacity:1}}
+
+.modal-overlay{display:none;position:fixed;inset:0;z-index:9000;background:rgba(3,6,5,.74);backdrop-filter:blur(3px);align-items:flex-end;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal-panel{background:var(--card2);border:1px solid var(--line);border-radius:22px 22px 0 0;width:100%;max-width:480px;max-height:82vh;overflow-y:auto;padding:22px}
+.modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.modal-title{font-size:1.05rem;font-weight:700}
+.modal-close{background:rgba(255,255,255,.07);border:none;color:var(--text);width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.search{width:100%;background:var(--bg2);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:12px 14px;font-size:.88rem;font-family:inherit;outline:none;margin-bottom:12px}
+.search:focus{border-color:var(--accent2)}
+.search::placeholder{color:var(--muted)}
+.country-list{max-height:52vh;overflow-y:auto}
+.country-list::-webkit-scrollbar{width:4px}
+.country-list::-webkit-scrollbar-thumb{background:var(--line2);border-radius:99px}
+.country-option{display:flex;align-items:center;gap:10px;padding:11px 12px;cursor:pointer;font-size:.85rem;border-radius:10px;transition:background .12s}
+.country-option:hover{background:rgba(37,211,102,.1)}
+.country-option .flag{font-size:1.1rem;flex-shrink:0}
+.country-option .cname{flex:1}
+.country-option .ccode{font-family:ui-monospace,monospace;font-size:.72rem;color:var(--accent2);flex-shrink:0}
+.qr-wrap{text-align:center}
+.qr-wrap img{background:#fff;padding:10px;border-radius:14px;width:240px;height:240px;display:none;margin:0 auto}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--card2);border:1px solid var(--line2);color:var(--text);padding:12px 20px;border-radius:12px;font-size:.82rem;z-index:9999;display:none;max-width:90%;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+.note{margin-top:14px;font-size:.72rem;color:#5c7a6b;line-height:1.6;text-align:center}
+</style>
+</head>
+<body>
+
+<nav class="topnav">
+  <button type="button" class="menu-burger" id="burger" aria-label="Menu">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
+  <div class="sq-menu-dropdown" id="menu-dropdown">
+    <button type="button" data-act="how">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>
+      How it works
+    </button>
+    <button type="button" data-act="qr">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 20h1"/></svg>
+      Pair with QR instead
+    </button>
+  </div>
+  <span class="topnav-title">Pixel X Ultra</span>
+  <span class="topnav-badge">Session</span>
+</nav>
+
+<div class="wrap">
+  <div class="hero">
+    <img src="/img/pixel.jpg" alt="Pixel X Ultra">
+    <div class="hero-text">
+      <div class="name">PIXEL X ULTRA</div>
+      <div class="tag">WhatsApp Session Generator</div>
+    </div>
+  </div>
+
+  <div class="wrap-inner">
+    <div class="header">
+      <div class="stat-pill"><span class="pulse-dot"></span><span id="online-count">—</span>&nbsp;pairing now</div>
+    </div>
+
+    <div class="card" id="pair-setup">
+      <span class="card-label">Pair your WhatsApp number</span>
+      <span class="card-label">Country</span>
+      <button type="button" class="country-trigger" id="country-trigger">
+        <span id="country-display">— Select country —</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+
+      <span class="card-label">WhatsApp number</span>
+      <div class="phone-row">
+        <div class="prefix-wrap">
+          <div class="prefix-box" id="prefix-display">+</div>
+          <input class="prefix-input" type="text" id="prefix-input" value="" placeholder="+" maxlength="6" inputmode="tel"/>
+        </div>
+        <input type="text" id="num-input" placeholder="712 345 678" inputmode="numeric" maxlength="15"/>
+      </div>
+
+      <button class="btn" id="pair-btn">Connect WhatsApp</button>
+      <button class="btn btn-ghost" id="qr-btn">Use QR code instead</button>
+      <div class="note">The session is delivered only to your own WhatsApp — never shown here.</div>
+    </div>
+
+    <div class="card" id="pair-status" style="display:none">
+      <span class="card-label" id="status-label">Connecting</span>
+      <div class="code-box" id="status-body">
+        <div class="spin" style="width:26px;height:26px;border-width:3px;margin:0 auto 14px;border-color:rgba(37,211,102,.25);border-top-color:#5ef2a0"></div>
+        <div class="hint">Requesting your pairing code…</div>
+      </div>
+      <div class="status-line" id="status-line" style="display:none">
+        <span class="dot amber" id="status-dot"></span><span id="status-text">Waiting for approval…</span>
+      </div>
+      <button class="btn btn-ghost" id="cancel-btn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="country-overlay">
+  <div class="modal-panel">
+    <div class="modal-head">
+      <div class="modal-title">Select country</div>
+      <button class="modal-close" data-close="country-overlay">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <input class="search" type="text" id="country-search" placeholder="Search country or code…" autocomplete="off"/>
+    <div class="country-list" id="country-list"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="how-overlay">
+  <div class="modal-panel">
+    <div class="modal-head">
+      <div class="modal-title">How it works</div>
+      <button class="modal-close" data-close="how-overlay">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <ul class="steps">
+      <li><span class="n">1</span><span>Pick your <b>country</b> and type the number.</span></li>
+      <li><span class="n">2</span><span>Tap <b>Connect WhatsApp</b> — an 8-character code appears.</span></li>
+      <li><span class="n">3</span><span>WhatsApp → <b>Linked devices</b> → <b>Link with phone number</b> → type the code.</span></li>
+      <li><span class="n">4</span><span>Pixel X Ultra messages <b>you</b> with your <b>SESSION_ID</b>.</span></li>
+      <li><span class="n">5</span><span>Paste it into <b>SESSION_ID</b> in your <b>.env</b> and restart the bot.</span></li>
+    </ul>
+    <div class="note">Pairing an existing WhatsApp account links a new device — your phone stays signed in. The session string is a password: never share it.</div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="qr-overlay">
+  <div class="modal-panel">
+    <div class="modal-head">
+      <div class="modal-title">QR pairing</div>
+      <button class="modal-close" data-close="qr-overlay">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="qr-wrap">
+      <img id="qr-img" alt="WhatsApp QR"/>
+      <div class="hint" id="qr-hint">Tap below to load a QR, then scan it from WhatsApp → Linked devices.</div>
+    </div>
+    <button class="btn" id="qr-load" style="margin-top:16px">Load QR</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  let countries = [];
+  let selected = null;
+  let keepTimer = null;
+  let statusTimer = null;
+  let activeId = null;
+
+  /* ---------- toast ---------- */
+  let toastTimer;
+  function toast(msg) {
+    const el = $("toast");
+    el.textContent = msg;
+    el.style.display = "block";
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => (el.style.display = "none"), 2800);
+  }
+
+  /* ---------- menu ---------- */
+  const burger = $("burger");
+  const dropdown = $("menu-dropdown");
+  burger.addEventListener("click", (e) => {
+    e.stopPropagation();
+    dropdown.classList.toggle("show");
+  });
+  document.addEventListener("click", (e) => {
+    if (!dropdown.contains(e.target) && !burger.contains(e.target)) dropdown.classList.remove("show");
+  });
+  dropdown.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-act]");
+    if (!btn) return;
+    dropdown.classList.remove("show");
+    if (btn.dataset.act === "how") open("how-overlay");
+    if (btn.dataset.act === "qr") { open("qr-overlay"); loadQr(); }
+  });
+
+  /* ---------- modals ---------- */
+  function open(id) { $(id).classList.add("show"); }
+  function close(id) { $(id).classList.remove("show"); }
+  document.addEventListener("click", (e) => {
+    const c = e.target.closest("[data-close]");
+    if (c) close(c.dataset.close);
+    if (e.target.classList.contains("modal-overlay")) close(e.target.id);
+  });
+
+  /* ---------- countries ---------- */
+  fetch("/countries.json")
+    .then((r) => r.json())
+    .then((list) => {
+      countries = list;
+      renderCountries(list);
+    })
+    .catch(() => toast("Could not load the country list"));
+
+  function renderCountries(list) {
+    const el = $("country-list");
+    el.textContent = "";
+    const frag = document.createDocumentFragment();
+    list.forEach((c) => {
+      const row = document.createElement("div");
+      row.className = "country-option";
+      const flag = document.createElement("span");
+      flag.className = "flag";
+      flag.textContent = c.flag;
+      const name = document.createElement("span");
+      name.className = "cname";
+      name.textContent = c.name;
+      const code = document.createElement("span");
+      code.className = "ccode";
+      code.textContent = c.code;
+      row.append(flag, name, code);
+      row.addEventListener("click", () => selectCountry(c));
+      frag.appendChild(row);
+    });
+    el.appendChild(frag);
+  }
+
+  function selectCountry(c) {
+    selected = c;
+    $("country-display").textContent = c.flag + " " + c.name + " (" + c.code + ")";
+    $("prefix-display").textContent = c.code;
+    $("prefix-input").value = c.code;
+    close("country-overlay");
+    $("num-input").focus();
+  }
+
+  $("country-trigger").addEventListener("click", () => {
+    open("country-overlay");
+    $("country-search").value = "";
+    renderCountries(countries);
+    setTimeout(() => $("country-search").focus(), 120);
+  });
+
+  $("country-search").addEventListener("input", (e) => {
+    const q = e.target.value.trim().toLowerCase();
+    renderCountries(
+      q
+        ? countries.filter((c) => c.name.toLowerCase().includes(q) || c.code.replace(/\D/g, "").includes(q.replace(/\D/g, "")))
+        : countries,
+    );
+  });
+
+  /* ---------- prefix box ---------- */
+  $("prefix-input").addEventListener("input", (e) => {
+    let v = e.target.value.replace(/[^0-9+]/g, "");
+    if (v && !v.startsWith("+")) v = "+" + v;
+    e.target.value = v;
+    $("prefix-display").textContent = v || "+";
+    if (v.length >= 2) {
+      const match = countries.find((c) => c.code === v);
+      if (match) {
+        selected = match;
+        $("country-display").textContent = match.flag + " " + match.name + " (" + match.code + ")";
+      }
+    }
+  });
+
+  /* ---------- keepalive + status ---------- */
+  function startKeepAlive() {
+    stopKeepAlive();
+    const ping = () => fetch("/keepalive").catch(() => {});
+    ping();
+    keepTimer = setInterval(ping, 20000);
+  }
+  function stopKeepAlive() {
+    if (keepTimer) clearInterval(keepTimer);
+    keepTimer = null;
+  }
+
+  function setStatus(kind, text) {
+    const dot = $("status-dot");
+    dot.className = "dot " + kind;
+    $("status-text").textContent = text;
+    $("status-line").style.display = "flex";
+  }
+
+  function stopStatusPoll() {
+    if (statusTimer) clearInterval(statusTimer);
+    statusTimer = null;
+  }
+
+  function pollStatus() {
+    stopStatusPoll();
+    if (!activeId) return;
+    let ticks = 0;
+    statusTimer = setInterval(async () => {
+      ticks += 1;
+      if (ticks > 100) { stopStatusPoll(); return; }
+      try {
+        const r = await fetch("/status?id=" + encodeURIComponent(activeId));
+        if (!r.ok) return;
+        const j = await r.json();
+        if (j.status === "paired") setStatus("amber", "Approved — preparing your session…");
+        if (j.status === "delivered") {
+          setStatus("ok", "Done. Your SESSION_ID is in your WhatsApp (Message yourself).");
+          stopStatusPoll();
+          stopKeepAlive();
+          $("cancel-btn").textContent = "Pair another number";
+        }
+        if (j.status === "failed") {
+          setStatus("bad", j.reason || "Pairing failed. Try again.");
+          stopStatusPoll();
+          stopKeepAlive();
+        }
+      } catch {}
+    }, 3000);
+  }
+
+  /* ---------- pairing ---------- */
+  $("pair-btn").addEventListener("click", async () => {
+    const digits = ($("prefix-input").value + $("num-input").value).replace(/\D/g, "");
+    if (digits.length < 8) return toast("Enter your number with the country code");
+    if (digits.length > 15) return toast("That number is too long");
+
+    const btn = $("pair-btn");
+    btn.disabled = true;
+    btn.textContent = "Requesting…";
+
+    $("pair-setup").style.display = "none";
+    $("pair-status").style.display = "block";
+    $("status-label").textContent = "Connecting";
+    $("status-body").innerHTML =
+      '<div class="spin" style="width:26px;height:26px;border-width:3px;margin:0 auto 14px;border-color:rgba(37,211,102,.25);border-top-color:#5ef2a0"></div><div class="hint">Requesting your pairing code…</div>';
+
+    try {
+      const r = await fetch("/code?number=" + encodeURIComponent(digits));
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || "Request failed");
+
+      activeId = j.id;
+      $("status-label").textContent = "Your pairing code";
+      $("status-body").innerHTML =
+        '<div class="code" id="code-text">' + j.code + "</div>" +
+        '<button class="btn btn-ghost" id="copy-code" style="margin:0 auto 14px;max-width:220px">Copy code</button>' +
+        '<ul class="steps">' +
+        '<li><span class="n">1</span><span>WhatsApp → <b>Linked devices</b> → <b>Link with phone number</b></span></li>' +
+        '<li><span class="n">2</span><span>Type <b>' + j.code + "</b></span></li>" +
+        '<li><span class="n">3</span><span>Wait for the DM with your <b>SESSION_ID</b></span></li>' +
+        "</ul>";
+      $("copy-code").addEventListener("click", () => {
+        navigator.clipboard?.writeText(j.code).then(
+          () => toast("Code copied"),
+          () => toast("Copy failed — long-press the code"),
+        );
+      });
+
+      setStatus("amber", "Waiting for you to approve the link…");
+      startKeepAlive();
+      pollStatus();
+    } catch (err) {
+      $("status-label").textContent = "Could not start";
+      $("status-body").innerHTML = '<div class="hint" style="color:#ff8b8b">' + (err.message || "Request failed") + "</div>";
+      $("status-line").style.display = "none";
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Connect WhatsApp";
+    }
+  });
+
+  $("cancel-btn").addEventListener("click", () => {
+    stopStatusPoll();
+    stopKeepAlive();
+    activeId = null;
+    $("pair-status").style.display = "none";
+    $("pair-setup").style.display = "block";
+    $("status-line").style.display = "none";
+    $("cancel-btn").textContent = "Cancel";
+    $("num-input").value = "";
+  });
+
+  $("qr-btn").addEventListener("click", () => { open("qr-overlay"); });
+
+  async function loadQr() {
+    $("qr-load").disabled = true;
+    $("qr-load").textContent = "Loading…";
+    try {
+      const r = await fetch("/qr");
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || "Request failed");
+      const img = $("qr-img");
+      img.src = j.qr;
+      img.style.display = "block";
+      $("qr-hint").textContent = "Scan it from WhatsApp → Linked devices → Link a device. Then wait for the DM.";
+      startKeepAlive();
+      activeId = j.id;
+      pollStatus();
+    } catch (err) {
+      toast(err.message || "QR failed");
+    } finally {
+      $("qr-load").disabled = false;
+      $("qr-load").textContent = "Load QR";
+    }
+  }
+  $("qr-load").addEventListener("click", loadQr);
+
+  /* ---------- live count ---------- */
+  async function count() {
+    try {
+      const r = await fetch("/keepalive");
+      const j = await r.json();
+      $("online-count").textContent = j.active ?? 0;
+    } catch {
+      $("online-count").textContent = "—";
+    }
+  }
+  count();
+  setInterval(count, 15000);
+})();
+</script>
+</body>
+</html>

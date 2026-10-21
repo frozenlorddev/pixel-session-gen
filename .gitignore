@@ -1,0 +1,5 @@
+node_modules/
+routes/session/
+.env
+*.log
+npm-debug.log*
