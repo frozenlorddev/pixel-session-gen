@@ -20,6 +20,39 @@ const {
 const { gate } = require("../lib/gate");
 const board = require("../lib/state");
 
+
+/**
+ * WhatsApp answers a bad number and a throttled IP very differently, but both
+ * look like "it just doesn't work" in the UI. Translate the common ones so the
+ * page can tell the user to wait instead of hammering the button.
+ */
+function explain(err) {
+  const status = err?.output?.statusCode || err?.statusCode || err?.status;
+  const msg = String(err?.message || err || "");
+  if (status === 429 || /rate[-_ ]?overlimit|too many|try again later/i.test(msg)) {
+    return {
+      http: 429,
+      code: "rate_limited",
+      text: "WhatsApp is throttling pairing attempts right now. Wait about 10 minutes and try once — repeated tries extend the block.",
+    };
+  }
+  if (status === 400 || /bad[- ]?request|invalid number|not-authorized/i.test(msg)) {
+    return {
+      http: 400,
+      code: "bad_number",
+      text: "WhatsApp rejected that number. Check the country code and remove any leading 0.",
+    };
+  }
+  if (status === 401 || status === 403) {
+    return {
+      http: 403,
+      code: "refused",
+      text: "WhatsApp refused the link request. Try again in a few minutes.",
+    };
+  }
+  return { http: 500, code: "unavailable", text: "Couldn't start pairing. Try again in a minute." };
+}
+
 const router = express.Router();
 const silent = pino({ level: "silent" });
 
@@ -141,10 +174,11 @@ router.get("/", async (req, res) => {
       }
     });
   } catch (err) {
-    console.error("[pair] start failed:", err?.message || err);
-    board.set(id, { status: "failed", reason: "Pairing could not start. Try again." });
+    const why = explain(err);
+    console.error("[pair] start failed:", why.code, err?.message || err);
+    board.set(id, { status: "failed", reason: why.text });
     if (!res.headersSent) {
-      res.status(500).json({ ok: false, error: "Service unavailable. Try again." });
+      res.status(why.http).json({ ok: false, code: why.code, error: why.text });
     }
     await finish();
   }

@@ -161,6 +161,8 @@ input[type=text]:focus{border-color:var(--accent2)}
         <input type="text" id="num-input" placeholder="712 345 678" inputmode="numeric" maxlength="15"/>
       </div>
 
+      <div class="hint" id="preview" style="margin:-6px 0 14px"></div>
+
       <button class="btn" id="pair-btn">Connect WhatsApp</button>
       <button class="btn btn-ghost" id="qr-btn">Use QR code instead</button>
       <div class="note">The session is delivered only to your own WhatsApp — never shown here.</div>
@@ -399,10 +401,42 @@ input[type=text]:focus{border-color:var(--accent2)}
     }, 3000);
   }
 
+  /* ---------- number assembly ---------- */
+  /**
+   * Handles the three ways people actually type a number, because string
+   * concatenation sent WhatsApp a wrong number and the code came back "wrong":
+   *   +254 | 0712345678      -> trunk zero dropped        254712345678
+   *   +254 | 254712345678    -> duplicate country stripped 254712345678
+   *   +254 | 712345678       -> used as is                 254712345678
+   */
+  function buildNumber(prefixRaw, localRaw) {
+    const cc = String(prefixRaw).replace(/\D/g, "");
+    let local = String(localRaw).replace(/\D/g, "");
+    if (!cc || !local) return "";
+    if (local.startsWith(cc) && local.length > cc.length + 5) local = local.slice(cc.length);
+    local = local.replace(/^0+/, "");
+    const full = cc + local;
+    return full.length >= 8 ? full : "";
+  }
+
+  function updatePreview() {
+    const full = buildNumber($("prefix-input").value, $("num-input").value);
+    const el = $("preview");
+    if (!full) {
+      el.textContent = "";
+      return;
+    }
+    el.innerHTML = "Code will be sent for <b style=\"color:var(--accent2)\">+" + full + "</b>";
+  }
+  ["input", "change", "keyup"].forEach((ev) => {
+    $("num-input").addEventListener(ev, updatePreview);
+    $("prefix-input").addEventListener(ev, updatePreview);
+  });
+
   /* ---------- pairing ---------- */
   $("pair-btn").addEventListener("click", async () => {
-    const digits = ($("prefix-input").value + $("num-input").value).replace(/\D/g, "");
-    if (digits.length < 8) return toast("Enter your number with the country code");
+    const digits = buildNumber($("prefix-input").value, $("num-input").value);
+    if (!digits) return toast("Enter your number with the country code");
     if (digits.length > 15) return toast("That number is too long");
 
     const btn = $("pair-btn");
@@ -424,6 +458,7 @@ input[type=text]:focus{border-color:var(--accent2)}
       $("status-label").textContent = "Your pairing code";
       $("status-body").innerHTML =
         '<div class="code" id="code-text">' + j.code + "</div>" +
+        '<div class="hint" style="margin:-4px 0 12px">for <b style="color:var(--accent2)">+' + digits + "</b> — enter the code on that same phone</div>" +
         '<button class="btn btn-ghost" id="copy-code" style="margin:0 auto 14px;max-width:220px">Copy code</button>' +
         '<ul class="steps">' +
         '<li><span class="n">1</span><span>WhatsApp → <b>Linked devices</b> → <b>Link with phone number</b></span></li>' +
