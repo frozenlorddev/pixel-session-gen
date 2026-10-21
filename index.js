@@ -1,5 +1,5 @@
 "use strict";
-require("events").EventEmitter.defaultMaxListeners = 200;
+require("events").EventEmitter.defaultMaxListeners = 2000;
 
 const express = require("express");
 const path = require("path");
@@ -36,8 +36,35 @@ app.get("/status", (req, res) => {
   const id = String(req.query.id || "");
   const row = board.get(id);
   if (!row) return res.status(404).json({ ok: false, status: "unknown" });
-  return res.json({ ok: true, status: row.status, reason: row.reason || null, code: row.code || null });
+  return res.json({
+    ok: true,
+    status: row.status,
+    reason: row.reason || null,
+    code: row.code || null,
+    attempt: row.attempt || 1,
+    number: row.number || null,
+    // How old the current code is, so the page can tell the user it is stale.
+    codeAgeMs: row.codeAt ? Date.now() - row.codeAt : null,
+  });
 });
+
+/** Everything needed to explain a stuck link without reading Render logs. */
+app.get("/diag", (req, res) =>
+  res.json({
+    ...pairRoute.diag?.(),
+    baileys: (() => {
+      try {
+        return require("./lib/wa").__resolved;
+      } catch (e) {
+        return "missing";
+      }
+    })(),
+    uptime: Math.round(process.uptime()),
+    rssMb: Math.round(process.memoryUsage().rss / 1048576),
+    sockets: stats().active,
+    now: new Date().toISOString(),
+  }),
+);
 
 app.get("/healthz", (req, res) =>
   res.json({

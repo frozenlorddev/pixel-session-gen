@@ -25,13 +25,21 @@ const router = express.Router();
 const silent = pino({ level: "silent" });
 
 const LINK_TIMEOUT_MS = Number(process.env.LINK_TIMEOUT_MS || 5 * 60 * 1000);
-const MAX_CODE_RETRIES = Number(process.env.MAX_CODE_RETRIES || 2);
+const MAX_RECONNECTS = Number(process.env.MAX_RECONNECTS || 6);
 
 /**
- * WhatsApp answers a bad number and a throttled IP very differently, but both
- * look like "it just doesn't work" in the UI. Translate the common ones so the
- * page can tell the user to wait instead of hammering the button.
+ * One live socket per phone number. WhatsApp keys a pending link to the newest
+ * registration for that number, so an older attempt still holding a socket is
+ * how an approval ends up delivered to nobody.
  */
+const LIVE = new Map(); // number -> { id, kill }
+const LOG = [];
+
+function note(id, event, extra) {
+  LOG.push({ t: new Date().toISOString(), id, event, ...(extra || {}) });
+  if (LOG.length > 80) LOG.shift();
+}
+
 function explain(err) {
   const status = err?.output?.statusCode || err?.statusCode || err?.status;
   const msg = String(err?.message || err || "");
@@ -55,14 +63,17 @@ function explain(err) {
 /**
  * GET /code?number=2547XXXXXXXX
  *
- * Order matters and is the fix for "stuck on login":
- *   1. build the socket
- *   2. attach connection.update BEFORE asking for a code — otherwise a `close`
- *      that lands while the code is being requested is never seen and the page
- *      waits forever on a socket that is already dead
- *   3. issue the code, publish it to the status board
- *   4. keep the socket alive until `open`, re-issuing the code if WhatsApp drops
- *      it (a pairing code dies with the socket that requested it)
+ * The rule that makes a code actually complete, learned the hard way:
+ *
+ *   ONE code per attempt. Asking for a second code for the same number silently
+ *   invalidates the first — so a user already typing it on their phone sits on
+ *   "Logging in…" forever while the server waits for an approval that can no
+ *   longer arrive.
+ *
+ * So: issue the code exactly once, then keep a socket alive, and if WhatsApp
+ * drops it (515 "restart required" is routine) rebuild the socket WITHOUT
+ * requesting a new code. The pairing registration lives in creds.json, not in
+ * the socket, so the reconnected socket still receives the phone's approval.
  */
 router.get("/", async (req, res) => {
   const raw = String(req.query.number || "").replace(/[^0-9]/g, "");
@@ -84,9 +95,13 @@ router.get("/", async (req, res) => {
   const id = newId();
   let sock = null;
   let answered = false;
-  let retries = 0;
+  let reconnects = 0;
   let finished = false;
   let watchdog = null;
+  let version = null;
+  let state = null;
+  let saveCreds = null;
+  let code = null; // the single code this attempt owns
 
   const reply = (status, body) => {
     if (answered) return;
@@ -102,10 +117,32 @@ router.get("/", async (req, res) => {
     try {
       sock?.ws?.close();
     } catch {}
+    if (LIVE.get(raw)?.id === id) LIVE.delete(raw);
     if (reason) board.set(id, { status: "failed", reason });
+    note(id, reason ? "failed" : "finished", { reason, number: raw });
     await cleanUp(id);
   };
 
+  // Supersede any earlier attempt still holding a socket for this number.
+  const previous = LIVE.get(raw);
+  if (previous && previous.id !== id) {
+    note(id, "superseding", { number: raw, previous: previous.id });
+    try {
+      previous.kill();
+    } catch {}
+  }
+  LIVE.set(raw, {
+    id,
+    kill: () => {
+      finished = true;
+      clearTimeout(watchdog);
+      try {
+        sock?.ws?.close();
+      } catch {}
+    },
+  });
+
+  /** Armed once, when the code is issued: a code's lifetime never extends. */
   const armWatchdog = () => {
     clearTimeout(watchdog);
     watchdog = setTimeout(
@@ -114,34 +151,17 @@ router.get("/", async (req, res) => {
     );
   };
 
-  board.set(id, { status: "started", number: "+" + raw });
+  function attach(s) {
+    s.ev.on("creds.update", saveCreds);
 
-  try {
-    const { version } = await fetchLatestBaileysVersion();
-    const { state, saveCreds } = await useMultiFileAuthState(sessionDir(id));
-
-    sock = makeWASocket({
-      version,
-      auth: {
-        creds: state.creds,
-        keys: makeCacheableSignalKeyStore(state.keys, silent),
-      },
-      printQRInTerminal: false,
-      logger: silent,
-      browser: Browsers.macOS("Safari"),
-      syncFullHistory: false,
-      generateHighQualityLinkPreview: false,
-      markOnlineOnConnect: false,
-      connectTimeoutMs: 60_000,
-      keepAliveIntervalMs: 25_000,
-      getMessage: async () => undefined,
-    });
-
-    sock.ev.on("creds.update", saveCreds);
-
-    sock.ev.on("connection.update", async ({ connection, lastDisconnect }) => {
+    s.ev.on("connection.update", async ({ connection, lastDisconnect }) => {
+      if (finished) return;
+      if (s !== sock) return;
       const statusCode = lastDisconnect?.error?.output?.statusCode;
-      console.log(`[pair ${id}] connection=${connection || "-"} code=${statusCode || "-"}`);
+      console.log(
+        `[pair ${id}] connection=${connection || "-"} code=${statusCode || "-"} haveCode=${!!code}`,
+      );
+      note(id, "connection", { connection: connection || null, code: statusCode || null });
 
       if (connection === "open") {
         clearTimeout(watchdog);
@@ -153,9 +173,9 @@ router.get("/", async (req, res) => {
             return;
           }
           const sessionId = toSessionString(creds);
-          const me = sock.user?.id;
-          await sock.sendMessage(me, { text: sessionId }).catch(() => {});
-          await sock.sendMessage(me, { text: instructionsText(sessionId) }).catch(() => {});
+          const me = s.user?.id;
+          await s.sendMessage(me, { text: sessionId }).catch(() => {});
+          await s.sendMessage(me, { text: instructionsText(sessionId) }).catch(() => {});
           board.set(id, { status: "delivered" });
         } catch (err) {
           console.error("[pair] handoff failed:", err?.message || err);
@@ -167,60 +187,115 @@ router.get("/", async (req, res) => {
         return;
       }
 
-      if (connection === "close") {
-        if (statusCode === 401 || statusCode === 403) {
-          await finish("WhatsApp logged the device out before the link finished. Start again.");
-          return;
-        }
-        if (!finished && retries < MAX_CODE_RETRIES) {
-          retries += 1;
-          console.log(`[pair ${id}] socket dropped — re-issuing code (${retries}/${MAX_CODE_RETRIES})`);
-          await delay(2500);
-          try {
-            const code = await sock.requestPairingCode(raw, generatePairingCode());
-            board.set(id, { status: "waiting", code, reissued: true });
-            console.log(`[pair ${id}] new code ${code}`);
-            armWatchdog();
-          } catch (err) {
-            const why = explain(err);
-            console.error("[pair] re-issue failed:", why.code, err?.message || err);
-            await finish(why.text);
-          }
-          return;
-        }
-        await finish("WhatsApp closed the pairing socket. Start again.");
-      }
-    });
+      if (connection !== "close") return;
 
-    /**
-     * 6.7.24 throws "Connection Closed" if the code is requested before the
-     * websocket has settled, and the Elite generator works around it with a
-     * short delay plus an explicit 8-character code. Same recipe here, with one
-     * retry on a fresh socket state.
-     */
-    let code = null;
-    for (let attempt = 1; attempt <= 2; attempt++) {
+      if (statusCode === 401 || statusCode === 403 || statusCode === 405) {
+        await finish(
+          "WhatsApp refused the link (logged out or blocked). Wait 10 minutes, then start again.",
+        );
+        return;
+      }
+
+      if (reconnects >= MAX_RECONNECTS) {
+        await finish("WhatsApp kept dropping the link. Wait 10 minutes and start again.");
+        return;
+      }
+
+      reconnects += 1;
+      board.set(id, { status: "waiting", code, attempt: reconnects + 1, reconnects });
+      console.log(`[pair ${id}] reconnecting (${reconnects}/${MAX_RECONNECTS}), code ${code} stays valid`);
+      note(id, "reconnect", { attempt: reconnects + 1, code, closeCode: statusCode || null });
+
       try {
-        await delay(2000);
-        code = await sock.requestPairingCode(raw, generatePairingCode());
-        break;
+        s.ws?.close();
+      } catch {}
+      await delay(2000);
+      if (finished) return;
+
+      // Rebuild the socket, keep the code: never request a second one.
+      await open(false);
+    });
+  }
+
+  /** requestPairingCode must run once per attempt, on a settled socket. */
+  async function requestCode(s) {
+    let lastErr = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        await delay(attempt === 1 ? 2000 : 2500);
+        return await s.requestPairingCode(raw, generatePairingCode());
       } catch (err) {
-        console.error(`[pair ${id}] requestPairingCode attempt ${attempt} failed:`, err?.message || err);
-        if (attempt === 2) throw err;
-        await delay(3000);
+        lastErr = err;
+        console.error(`[pair ${id}] requestPairingCode attempt ${attempt}:`, err?.message || err);
       }
     }
+    throw lastErr;
+  }
 
-    board.set(id, { status: "waiting", code });
-    console.log(`[pair ${id}] code ${code} for +${raw}`);
-    reply(200, { ok: true, code, id });
-    armWatchdog();
+  async function open(issueCode) {
+    try {
+      sock = makeWASocket({
+        version,
+        auth: {
+          creds: state.creds,
+          keys: makeCacheableSignalKeyStore(state.keys, silent),
+        },
+        printQRInTerminal: false,
+        logger: silent,
+        browser: Browsers.macOS("Safari"),
+        syncFullHistory: false,
+        generateHighQualityLinkPreview: true,
+        markOnlineOnConnect: true,
+        connectTimeoutMs: 60_000,
+        keepAliveIntervalMs: 25_000,
+        getMessage: async () => undefined,
+      });
+
+      attach(sock);
+
+      if (issueCode) {
+        code = await requestCode(sock);
+        board.set(id, {
+          status: "waiting",
+          code,
+          attempt: reconnects + 1,
+          reconnects,
+          codeAt: Date.now(),
+          number: "+" + raw,
+        });
+        console.log(`[pair ${id}] code ${code} for +${raw} (attempt ${reconnects + 1})`);
+        note(id, "code", { code, number: raw });
+        reply(200, { ok: true, code, id });
+        armWatchdog();
+      }
+    } catch (err) {
+      const why = explain(err);
+      console.error("[pair] start failed:", why.code, err?.message || err);
+      note(id, "start_failed", { code: why.code, message: String(err?.message || err) });
+      reply(why.http, { ok: false, code: why.code, error: why.text });
+      await finish(why.text);
+    }
+  }
+
+  board.set(id, { status: "started", number: "+" + raw });
+
+  try {
+    ({ version } = await fetchLatestBaileysVersion());
+    ({ state, saveCreds } = await useMultiFileAuthState(sessionDir(id)));
   } catch (err) {
     const why = explain(err);
-    console.error("[pair] start failed:", why.code, err?.message || err);
     reply(why.http, { ok: false, code: why.code, error: why.text });
     await finish(why.text);
+    return;
   }
+
+  await open(true);
+});
+
+/** Read-only view of live attempts, surfaced at /diag. */
+router.diag = () => ({
+  live: [...LIVE.entries()].map(([number, v]) => ({ number: "+" + number, id: v.id })),
+  log: LOG.slice(-30),
 });
 
 module.exports = router;

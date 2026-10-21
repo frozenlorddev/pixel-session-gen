@@ -241,6 +241,7 @@ input[type=text]:focus{border-color:var(--accent2)}
   let statusTimer = null;
   let activeId = null;
   let shownCode = null;
+  let shownQr = null;
 
   /* ---------- toast ---------- */
   let toastTimer;
@@ -384,6 +385,15 @@ input[type=text]:focus{border-color:var(--accent2)}
       if (ticks > 100) { stopStatusPoll(); return; }
       try {
         const r = await fetch("/status?id=" + encodeURIComponent(activeId));
+        if (r.status === 404) {
+          // The service restarted (Render free plan) or the attempt expired.
+          // Without this the page waits on a socket that no longer exists,
+          // which looks exactly like the phone hanging on "Logging in…".
+          stopStatusPoll();
+          stopKeepAlive();
+          setStatus("bad", "The server restarted and lost this attempt. Tap “Pair another number” and start again.");
+          return;
+        }
         if (!r.ok) return;
         const j = await r.json();
         if (j.code && j.code !== shownCode) {
@@ -393,6 +403,11 @@ input[type=text]:focus{border-color:var(--accent2)}
             el.textContent = j.code;
             toast("New code issued — the previous one expired");
           }
+          setStatus("amber", "A fresh code was issued. Enter the newest one on your phone.");
+        } else if (j.codeAgeMs && j.codeAgeMs > 180000) {
+          setStatus("amber", "This code is nearly expired. If the phone is stuck, pair again for a fresh one.");
+        } else if (j.reconnects) {
+          setStatus("amber", "WhatsApp dropped the socket — reconnecting. The same code is still valid, keep it entered.");
         }
         if (j.status === "paired") setStatus("amber", "Approved — preparing your session…");
         if (j.status === "delivered") {
@@ -508,6 +523,39 @@ input[type=text]:focus{border-color:var(--accent2)}
 
   $("qr-btn").addEventListener("click", () => { open("qr-overlay"); });
 
+  function pollQr(id) {
+    clearInterval(window.__qrTimer);
+    window.__qrTimer = setInterval(async () => {
+      try {
+        const r = await fetch("/qr/state?id=" + encodeURIComponent(id));
+        if (!r.ok) {
+          clearInterval(window.__qrTimer);
+          $("qr-hint").textContent = "The server restarted and lost this QR. Tap Load QR again.";
+          return;
+        }
+        const j = await r.json();
+        if (j.qr && j.qr !== shownQr) {
+          shownQr = j.qr;
+          $("qr-img").src = j.qr;
+        }
+        if (j.status === "waiting") {
+          $("qr-hint").textContent = "Scan it from WhatsApp → Linked devices → Link a device.";
+        }
+        if (j.status === "paired") $("qr-hint").textContent = "Scanned — preparing your session…";
+        if (j.status === "delivered") {
+          clearInterval(window.__qrTimer);
+          $("qr-hint").textContent = "Done. Your SESSION_ID is in your WhatsApp (Message yourself).";
+          stopKeepAlive();
+        }
+        if (j.status === "failed") {
+          clearInterval(window.__qrTimer);
+          $("qr-hint").textContent = j.reason || "QR pairing failed. Tap Load QR again.";
+          stopKeepAlive();
+        }
+      } catch {}
+    }, 2500);
+  }
+
   async function loadQr() {
     $("qr-load").disabled = true;
     $("qr-load").textContent = "Loading…";
@@ -518,13 +566,13 @@ input[type=text]:focus{border-color:var(--accent2)}
       const img = $("qr-img");
       img.src = j.qr;
       img.style.display = "block";
-      $("qr-hint").textContent = "Scan it from WhatsApp → Linked devices → Link a device. Then wait for the DM.";
+      shownQr = j.qr;
+      $("qr-hint").textContent = "Scan it from WhatsApp → Linked devices → Link a device.";
       startKeepAlive();
-      activeId = j.id;
-      shownCode = j.code || null;
-      pollStatus();
+      pollQr(j.id);
     } catch (err) {
       toast(err.message || "QR failed");
+      $("qr-hint").textContent = "QR failed. Tap Load QR to try again.";
     } finally {
       $("qr-load").disabled = false;
       $("qr-load").textContent = "Load QR";
